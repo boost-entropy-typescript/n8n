@@ -135,15 +135,26 @@ function executeErrorWorkflow(
 				// make sure there are no possible security gaps
 				return;
 			}
-
-			// eslint-disable-next-line @typescript-eslint/no-floating-promises
-			getWorkflowOwner(workflowData.id).then((user) => {
-				void WorkflowHelpers.executeErrorWorkflow(
-					workflowData.settings!.errorWorkflow as string,
-					workflowErrorData,
-					user,
-				);
-			});
+			getWorkflowOwner(workflowData.id)
+				.then((user) => {
+					void WorkflowHelpers.executeErrorWorkflow(
+						workflowData.settings!.errorWorkflow as string,
+						workflowErrorData,
+						user,
+					);
+				})
+				.catch((error) => {
+					Logger.error(
+						`Could not execute ErrorWorkflow for execution ID ${this.executionId} because of error querying the workflow owner`,
+						{
+							executionId,
+							errorWorkflowId: workflowData.settings!.errorWorkflow!.toString(),
+							workflowId: workflowData.id,
+							error,
+							workflowErrorData,
+						},
+					);
+				});
 		} else if (
 			mode !== 'error' &&
 			workflowData.id !== undefined &&
@@ -397,6 +408,7 @@ export function hookFunctionsPreExecute(parentProcessMode?: string): IWorkflowEx
 								contextData: {},
 								nodeExecutionStack: [],
 								waitingExecution: {},
+								waitingExecutionSource: {},
 							},
 						};
 					}
@@ -752,6 +764,7 @@ export async function getRunData(
 		data: {
 			main: [inputData],
 		},
+		source: null,
 	});
 
 	const runExecutionData: IRunExecutionData = {
@@ -763,6 +776,7 @@ export async function getRunData(
 			contextData: {},
 			nodeExecutionStack,
 			waitingExecution: {},
+			waitingExecutionSource: {},
 		},
 	};
 
