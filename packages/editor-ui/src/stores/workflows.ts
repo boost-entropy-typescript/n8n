@@ -7,6 +7,7 @@ import {
 	STORES,
 } from "@/constants";
 import {
+	ICredentialMap,
 	IExecutionResponse,
 	IExecutionsCurrentSummaryExtended,
 	IExecutionsSummary,
@@ -16,12 +17,14 @@ import {
 	IPushDataExecutionFinished,
 	IPushDataNodeExecuteAfter,
 	IUpdateInformation,
+	IUsedCredential,
 	IWorkflowDb,
 	IWorkflowsMap,
 	WorkflowsState,
 } from "@/Interface";
 import {defineStore} from "pinia";
 import {
+	deepCopy,
 	IConnection,
 	IConnections,
 	IDataObject,
@@ -37,6 +40,7 @@ import {
 	IWorkflowSettings,
 } from 'n8n-workflow';
 import Vue from "vue";
+
 import {useRootStore} from "./n8nRootStore";
 import {
 	getActiveWorkflows,
@@ -73,6 +77,7 @@ const createEmptyWorkflow = (): IWorkflowDb => ({
 export const useWorkflowsStore = defineStore(STORES.WORKFLOWS, {
 	state: (): WorkflowsState => ({
 		workflow: createEmptyWorkflow(),
+		usedCredentials: {},
 		activeWorkflows: [],
 		activeExecutions: [],
 		currentWorkflowExecutions: [],
@@ -266,6 +271,13 @@ export const useWorkflowsStore = defineStore(STORES.WORKFLOWS, {
 			this.workflow.id = id === 'new' ? PLACEHOLDER_EMPTY_WORKFLOW_ID : id;
 		},
 
+		setUsedCredentials(data: IUsedCredential[]) {
+			this.usedCredentials = data.reduce<{ [name: string]: IUsedCredential }>((accu, credential) => {
+				accu[credential.id!] = credential;
+				return accu;
+			}, {});
+		},
+
 		setWorkflowName(data: { newName: string, setStateDirty: boolean }): void {
 			if (data.setStateDirty === true) {
 				const uiStore = useUIStore();
@@ -323,7 +335,10 @@ export const useWorkflowsStore = defineStore(STORES.WORKFLOWS, {
 		},
 
 		addWorkflow(workflow: IWorkflowDb) : void {
-			Vue.set(this.workflowsById, workflow.id, workflow);
+			Vue.set(this.workflowsById, workflow.id, {
+				...this.workflowsById[workflow.id],
+				...deepCopy(workflow),
+			});
 		},
 
 		setWorkflowActive(workflowId: string): void {
