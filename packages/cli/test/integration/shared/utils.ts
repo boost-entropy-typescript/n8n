@@ -56,7 +56,6 @@ import type {
 	PostgresSchemaSection,
 } from './types';
 import { licenseController } from '@/license/license.controller';
-import { eventBusRouter } from '@/eventbus/eventBusRoutes';
 import { registerController } from '@/decorators';
 import {
 	AuthController,
@@ -75,12 +74,13 @@ import { InternalHooks } from '@/InternalHooks';
 import { LoadNodesAndCredentials } from '@/LoadNodesAndCredentials';
 import { PostHogClient } from '@/posthog';
 import { LdapManager } from '@/Ldap/LdapManager.ee';
-import { LDAP_ENABLED } from '@/Ldap/constants';
 import { handleLdapInit } from '@/Ldap/helpers';
 import { Push } from '@/push';
 import { setSamlLoginEnabled } from '@/sso/saml/samlHelpers';
 import { SamlService } from '@/sso/saml/saml.service.ee';
 import { SamlController } from '@/sso/saml/routes/saml.controller.ee';
+import { EventBusController } from '@/eventbus/eventBus.controller';
+import { License } from '../../../src/License';
 
 export const mockInstance = <T>(
 	ctor: new (...args: any[]) => T,
@@ -151,7 +151,6 @@ export async function initTestServer({
 			credentials: { controller: credentialsController, path: 'credentials' },
 			workflows: { controller: workflowsController, path: 'workflows' },
 			license: { controller: licenseController, path: 'license' },
-			eventBus: { controller: eventBusRouter, path: 'eventbus' },
 		};
 
 		if (enablePublicAPI) {
@@ -176,6 +175,9 @@ export async function initTestServer({
 
 		for (const group of functionEndpoints) {
 			switch (group) {
+				case 'eventBus':
+					registerController(testServer.app, config, new EventBusController());
+					break;
 				case 'auth':
 					registerController(
 						testServer.app,
@@ -184,7 +186,7 @@ export async function initTestServer({
 					);
 					break;
 				case 'ldap':
-					config.set(LDAP_ENABLED, true);
+					Container.get(License).isLdapEnabled = () => true;
 					await handleLdapInit();
 					const { service, sync } = LdapManager.getInstance();
 					registerController(
@@ -266,7 +268,7 @@ const classifyEndpointGroups = (endpointGroups: EndpointGroup[]) => {
 	const routerEndpoints: EndpointGroup[] = [];
 	const functionEndpoints: EndpointGroup[] = [];
 
-	const ROUTER_GROUP = ['credentials', 'workflows', 'publicApi', 'eventBus', 'license'];
+	const ROUTER_GROUP = ['credentials', 'workflows', 'publicApi', 'license'];
 
 	endpointGroups.forEach((group) =>
 		(ROUTER_GROUP.includes(group) ? routerEndpoints : functionEndpoints).push(group),
