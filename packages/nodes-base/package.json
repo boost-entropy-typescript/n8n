@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-base",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Base nodes of n8n",
   "license": "SEE LICENSE IN LICENSE.md",
   "homepage": "https://n8n.io",
@@ -466,6 +466,7 @@
       "dist/nodes/Dropbox/Dropbox.node.js",
       "dist/nodes/Dropcontact/Dropcontact.node.js",
       "dist/nodes/EditImage/EditImage.node.js",
+      "dist/nodes/E2eTest/E2eTest.node.js",
       "dist/nodes/Egoi/Egoi.node.js",
       "dist/nodes/Elastic/Elasticsearch/Elasticsearch.node.js",
       "dist/nodes/Elastic/ElasticSecurity/ElasticSecurity.node.js",
