@@ -272,15 +272,7 @@ export class Server extends AbstractServer {
 			),
 			Container.get(MeController),
 			new NodeTypesController(config, nodeTypes),
-			new PasswordResetController(
-				logger,
-				externalHooks,
-				internalHooks,
-				mailer,
-				userService,
-				jwtService,
-				mfaService,
-			),
+			Container.get(PasswordResetController),
 			Container.get(TagsController),
 			new TranslationController(config, this.credentialTypes),
 			new UsersController(
@@ -620,7 +612,7 @@ export class Server extends AbstractServer {
 		this.app.get(
 			`/${this.restEndpoint}/active`,
 			ResponseHelper.send(async (req: WorkflowRequest.GetAllActive) => {
-				return this.activeWorkflowRunner.getActiveWorkflows(req.user);
+				return this.activeWorkflowRunner.allActiveInStorage(req.user);
 			}),
 		);
 
