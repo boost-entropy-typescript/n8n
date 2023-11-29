@@ -2,7 +2,6 @@ import { In } from 'typeorm';
 import { compare, genSaltSync, hash } from 'bcryptjs';
 import { Container } from 'typedi';
 
-import * as ResponseHelper from '@/ResponseHelper';
 import type { WhereClause } from '@/Interfaces';
 import type { User } from '@db/entities/User';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '@db/entities/User';
@@ -11,6 +10,8 @@ import { License } from '@/License';
 import { getWebhookBaseUrl } from '@/WebhookHelpers';
 import { RoleService } from '@/services/role.service';
 import { UserRepository } from '@db/repositories/user.repository';
+import { BadRequestError } from '@/errors/response-errors/bad-request.error';
+import { ApplicationError } from 'n8n-workflow';
 
 export function isSharingEnabled(): boolean {
 	return Container.get(License).isSharingEnabled();
@@ -43,7 +44,7 @@ export function generateUserInviteUrl(inviterId: string, inviteeId: string): str
 // TODO: Enforce at model level
 export function validatePassword(password?: string): string {
 	if (!password) {
-		throw new ResponseHelper.BadRequestError('Password is mandatory');
+		throw new BadRequestError('Password is mandatory');
 	}
 
 	const hasInvalidLength =
@@ -70,7 +71,7 @@ export function validatePassword(password?: string): string {
 			message.push('Password must contain at least 1 uppercase letter.');
 		}
 
-		throw new ResponseHelper.BadRequestError(message.join(' '));
+		throw new BadRequestError(message.join(' '));
 	}
 
 	return password;
@@ -94,14 +95,15 @@ export const hashPassword = async (validPassword: string): Promise<string> =>
 export async function compareHash(plaintext: string, hashed: string): Promise<boolean | undefined> {
 	try {
 		return await compare(plaintext, hashed);
-	} catch (error) {
+	} catch (e) {
+		const error = e instanceof Error ? e : new Error(`${e}`);
+
 		if (error instanceof Error && error.message.includes('Invalid salt version')) {
 			error.message +=
 				'. Comparison against unhashed string. Please check that the value compared against has been hashed.';
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-		throw new Error(error);
+		throw new ApplicationError(error.message, { cause: error });
 	}
 }
 

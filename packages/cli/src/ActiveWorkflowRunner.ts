@@ -29,7 +29,8 @@ import {
 	Workflow,
 	WorkflowActivationError,
 	ErrorReporterProxy as ErrorReporter,
-	WebhookPathAlreadyTakenError,
+	WebhookPathTakenError,
+	ApplicationError,
 } from 'n8n-workflow';
 
 import type express from 'express';
@@ -42,7 +43,6 @@ import type {
 	WebhookAccessControlOptions,
 	WebhookRequest,
 } from '@/Interfaces';
-import * as ResponseHelper from '@/ResponseHelper';
 import * as WebhookHelpers from '@/WebhookHelpers';
 import * as WorkflowExecuteAdditionalData from '@/WorkflowExecuteAdditionalData';
 
@@ -68,6 +68,7 @@ import { SharedWorkflowRepository } from '@db/repositories/sharedWorkflow.reposi
 import { WorkflowRepository } from '@db/repositories/workflow.repository';
 import { MultiMainSetup } from '@/services/orchestration/main/MultiMainSetup.ee';
 import { ActivationErrorsService } from '@/ActivationErrors.service';
+import { NotFoundError } from './errors/response-errors/not-found.error';
 
 const WEBHOOK_PROD_UNREGISTERED_HINT =
 	"The workflow must be active for a production URL to run successfully. You can activate the workflow using the toggle in the top-right of the editor. Note that unlike test URL calls, production URL calls aren't shown on the canvas (only in the executions list)";
@@ -165,9 +166,7 @@ export class ActiveWorkflowRunner implements IWebhookManager {
 		});
 
 		if (workflowData === null) {
-			throw new ResponseHelper.NotFoundError(
-				`Could not find workflow with id "${webhook.workflowId}"`,
-			);
+			throw new NotFoundError(`Could not find workflow with id "${webhook.workflowId}"`);
 		}
 
 		const workflow = new Workflow({
@@ -196,7 +195,7 @@ export class ActiveWorkflowRunner implements IWebhookManager {
 		const workflowStartNode = workflow.getNode(webhookData.node);
 
 		if (workflowStartNode === null) {
-			throw new ResponseHelper.NotFoundError('Could not find node to process webhook.');
+			throw new NotFoundError('Could not find node to process webhook.');
 		}
 
 		return new Promise((resolve, reject) => {
@@ -252,7 +251,7 @@ export class ActiveWorkflowRunner implements IWebhookManager {
 
 		const webhook = await this.webhookService.findWebhook(httpMethod, path);
 		if (webhook === null) {
-			throw new ResponseHelper.NotFoundError(
+			throw new NotFoundError(
 				webhookNotFoundErrorMessage(path, httpMethod),
 				WEBHOOK_PROD_UNREGISTERED_HINT,
 			);
@@ -403,7 +402,7 @@ export class ActiveWorkflowRunner implements IWebhookManager {
 				// TODO check if there is standard error code for duplicate key violation that works
 				// with all databases
 				if (error instanceof Error && error.name === 'QueryFailedError') {
-					error = new WebhookPathAlreadyTakenError(webhook.node, error);
+					error = new WebhookPathTakenError(webhook.node, error);
 				} else if (error.detail) {
 					// it's a error running the webhook methods (checkExists, create)
 					error.message = error.detail;
@@ -427,7 +426,7 @@ export class ActiveWorkflowRunner implements IWebhookManager {
 		});
 
 		if (workflowData === null) {
-			throw new Error(`Could not find workflow with id "${workflowId}"`);
+			throw new ApplicationError('Could not find workflow', { extra: { workflowId } });
 		}
 
 		const workflow = new Workflow({
