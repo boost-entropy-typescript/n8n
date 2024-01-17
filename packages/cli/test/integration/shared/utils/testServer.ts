@@ -38,7 +38,7 @@ function prefix(pathSegment: string) {
 
 		url.pathname = pathSegment + url.pathname;
 		request.url = url.toString();
-		return request;
+		return await request;
 	};
 }
 
@@ -131,8 +131,8 @@ export const setupTestServer = ({
 						break;
 
 					case 'executions':
-						const { executionsController } = await import('@/executions/executions.controller');
-						app.use(`/${REST_PATH_SEGMENT}/executions`, executionsController);
+						const { ExecutionsController } = await import('@/executions/executions.controller');
+						registerController(app, ExecutionsController);
 						break;
 
 					case 'variables':

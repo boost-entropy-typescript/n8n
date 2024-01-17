@@ -259,6 +259,13 @@ export class Worker extends BaseCommand {
 
 	constructor(argv: string[], cmdConfig: IConfig) {
 		super(argv, cmdConfig);
+
+		if (!process.env.N8N_ENCRYPTION_KEY) {
+			throw new ApplicationError(
+				'Missing encryption key. Worker started without the required N8N_ENCRYPTION_KEY env var. More information: https://docs.n8n.io/hosting/environment-variables/configuration-methods/#encryption-key',
+			);
+		}
+
 		this.setInstanceType('worker');
 		this.setInstanceQueueModeId();
 	}
@@ -338,8 +345,9 @@ export class Worker extends BaseCommand {
 		Worker.jobQueue = Container.get(Queue);
 		await Worker.jobQueue.init();
 		this.logger.debug('Queue singleton ready');
-		void Worker.jobQueue.process(flags.concurrency, async (job) =>
-			this.runJob(job, this.nodeTypes),
+		void Worker.jobQueue.process(
+			flags.concurrency,
+			async (job) => await this.runJob(job, this.nodeTypes),
 		);
 
 		Worker.jobQueue.getBullObjectInstance().on('global:progress', (jobId: JobId, progress) => {
