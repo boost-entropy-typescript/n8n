@@ -13,11 +13,11 @@ import { useUIStore } from '@/stores/ui.store';
 import { useSSOStore } from '@/stores/sso.store';
 import { EnterpriseEditionFeature, VIEWS, EDITABLE_CANVAS_VIEWS } from '@/constants';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { middleware } from '@/rbac/middleware';
+import { middleware } from '@/utils/rbac/middleware';
 import type { RouteConfig, RouterMiddleware } from '@/types/router';
 import { initializeCore } from '@/init';
 import { tryToParseNumber } from '@/utils/typesUtils';
-import { projectsRoutes } from '@/features/projects/projects.routes';
+import { projectsRoutes } from '@/routes/projects.routes';
 
 const ChangePasswordView = async () => await import('./views/ChangePasswordView.vue');
 const ErrorView = async () => await import('./views/ErrorView.vue');
@@ -165,7 +165,7 @@ export const routes = [
 			// Templates view remembers it's scroll position on back
 			scrollOffset: 0,
 			telemetry: {
-				getProperties(route: RouteLocation) {
+				getProperties() {
 					const templatesStore = useTemplatesStore();
 					return {
 						wf_template_repo_session_id: templatesStore.currentSessionId,
@@ -373,6 +373,7 @@ export const routes = [
 					return !!localStorage.getItem('features.NodeViewV2');
 				},
 			},
+			nodeView: true,
 		},
 	},
 	{
@@ -474,7 +475,7 @@ export const routes = [
 					},
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'usage',
 							};
@@ -492,7 +493,7 @@ export const routes = [
 					middleware: ['authenticated'],
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'personal',
 							};
@@ -515,7 +516,7 @@ export const routes = [
 					},
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'users',
 							};
@@ -533,7 +534,7 @@ export const routes = [
 					middleware: ['authenticated'],
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'api',
 							};
@@ -556,7 +557,7 @@ export const routes = [
 					},
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'environments',
 							};
@@ -579,7 +580,7 @@ export const routes = [
 					},
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'external-secrets',
 							};
@@ -606,7 +607,7 @@ export const routes = [
 					},
 					telemetry: {
 						pageCategory: 'settings',
-						getProperties(route: RouteLocation) {
+						getProperties() {
 							return {
 								feature: 'sso',
 							};
