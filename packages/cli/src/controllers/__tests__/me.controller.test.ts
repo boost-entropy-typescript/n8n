@@ -9,7 +9,6 @@ import { AUTH_COOKIE_NAME } from '@/constants';
 import type { AuthenticatedRequest, MeRequest } from '@/requests';
 import { UserService } from '@/services/user.service';
 import { ExternalHooks } from '@/ExternalHooks';
-import { InternalHooks } from '@/InternalHooks';
 import { License } from '@/License';
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { UserRepository } from '@/databases/repositories/user.repository';
@@ -21,7 +20,6 @@ const browserId = 'test-browser-id';
 
 describe('MeController', () => {
 	const externalHooks = mockInstance(ExternalHooks);
-	mockInstance(InternalHooks);
 	const eventService = mockInstance(EventService);
 	const userService = mockInstance(UserService);
 	const userRepository = mockInstance(UserRepository);
@@ -224,6 +222,26 @@ describe('MeController', () => {
 			await expect(controller.storeSurveyAnswers(req)).rejects.toThrowError(
 				new BadRequestError('Personalization answers are mandatory'),
 			);
+		});
+
+		it('should throw BadRequestError on XSS attempt', async () => {
+			const req = mock<MeRequest.SurveyAnswers>({
+				body: { 'test-answer': '<script>alert("XSS")</script>' },
+			});
+
+			await expect(controller.storeSurveyAnswers(req)).rejects.toThrowError(BadRequestError);
+		});
+	});
+
+	describe('updateCurrentUserSettings', () => {
+		it('should throw BadRequestError on XSS attempt', async () => {
+			const req = mock<AuthenticatedRequest>({
+				body: {
+					userActivated: '<script>alert("XSS")</script>',
+				},
+			});
+
+			await expect(controller.updateCurrentUserSettings(req)).rejects.toThrowError(BadRequestError);
 		});
 	});
 
