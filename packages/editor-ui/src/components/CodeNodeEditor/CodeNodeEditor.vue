@@ -118,7 +118,9 @@ const i18n = useI18n();
 const telemetry = useTelemetry();
 
 onMounted(() => {
-	if (!props.isReadOnly) codeNodeEditorEventBus.on('error-line-number', highlightLine);
+	if (!props.isReadOnly) codeNodeEditorEventBus.on('highlightLine', highlightLine);
+
+	codeNodeEditorEventBus.on('codeDiffApplied', diffApplied);
 
 	const { isReadOnly, language } = props;
 	const extensions: Extension[] = [
@@ -185,7 +187,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-	if (!props.isReadOnly) codeNodeEditorEventBus.off('error-line-number', highlightLine);
+	codeNodeEditorEventBus.off('codeDiffApplied', diffApplied);
+	if (!props.isReadOnly) codeNodeEditorEventBus.off('highlightLine', highlightLine);
 });
 
 const aiEnabled = computed(() => {
@@ -205,6 +208,22 @@ const languageExtensions = computed<[LanguageSupport, ...Extension[]]>(() => {
 			return [python(), autocompletionExtension('python')];
 	}
 });
+
+watch(
+	() => props.modelValue,
+	(newValue) => {
+		if (!editor.value) {
+			return;
+		}
+		const current = editor.value.state.doc.toString();
+		if (current === newValue) {
+			return;
+		}
+		editor.value.dispatch({
+			changes: { from: 0, to: getCurrentEditorContent().length, insert: newValue },
+		});
+	},
+);
 
 watch(
 	() => props.mode,
@@ -323,6 +342,13 @@ function getLine(lineNumber: number): Line | null {
 	}
 }
 
+function diffApplied() {
+	codeNodeEditorContainerRef.value?.classList.add('flash-editor');
+	codeNodeEditorContainerRef.value?.addEventListener('animationend', () => {
+		codeNodeEditorContainerRef.value?.classList.remove('flash-editor');
+	});
+}
+
 function highlightLine(lineNumber: number | 'final') {
 	if (!editor.value) return;
 
@@ -389,6 +415,25 @@ function onAiLoadEnd() {
 :deep(.el-tabs) {
 	.code-editor-tabs .cm-editor {
 		border: 0;
+	}
+}
+
+@keyframes backgroundAnimation {
+	0% {
+		background-color: none;
+	}
+	30% {
+		background-color: rgba(41, 163, 102, 0.1);
+	}
+	100% {
+		background-color: none;
+	}
+}
+
+.flash-editor {
+	:deep(.cm-editor),
+	:deep(.cm-gutter) {
+		animation: backgroundAnimation 1.5s ease-in-out;
 	}
 }
 </style>

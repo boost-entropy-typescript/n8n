@@ -2,22 +2,24 @@ import type { Response } from 'express';
 import { Container } from 'typedi';
 import jwt from 'jsonwebtoken';
 import { mock, anyObject } from 'jest-mock-extended';
+
 import type { PublicUser } from '@/Interfaces';
 import type { User } from '@db/entities/User';
 import { API_KEY_PREFIX, MeController } from '@/controllers/me.controller';
 import { AUTH_COOKIE_NAME } from '@/constants';
 import type { AuthenticatedRequest, MeRequest } from '@/requests';
 import { UserService } from '@/services/user.service';
-import { ExternalHooks } from '@/ExternalHooks';
-import { License } from '@/License';
+import { ExternalHooks } from '@/external-hooks';
+import { License } from '@/license';
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
-import { UserRepository } from '@/databases/repositories/user.repository';
 import { EventService } from '@/events/event.service';
 import { badPasswords } from '@test/testData';
 import { mockInstance } from '@test/mocking';
 import { AuthUserRepository } from '@/databases/repositories/authUser.repository';
-import { MfaService } from '@/Mfa/mfa.service';
-import { ForbiddenError } from '@/errors/response-errors/forbidden.error';
+import { InvalidAuthTokenRepository } from '@db/repositories/invalidAuthToken.repository';
+import { UserRepository } from '@db/repositories/user.repository';
+import { MfaService } from '@/mfa/mfa.service';
+import { InvalidMfaCodeError } from '@/errors/response-errors/invalid-mfa-code.error';
 
 const browserId = 'test-browser-id';
 
@@ -28,6 +30,7 @@ describe('MeController', () => {
 	const userRepository = mockInstance(UserRepository);
 	const mockMfaService = mockInstance(MfaService);
 	mockInstance(AuthUserRepository);
+	mockInstance(InvalidAuthTokenRepository);
 	mockInstance(License).isWithinUsersLimit.mockReturnValue(true);
 	const controller = Container.get(MeController);
 
@@ -53,9 +56,14 @@ describe('MeController', () => {
 				password: 'password',
 				authIdentities: [],
 				role: 'global:owner',
+				mfaEnabled: false,
 			});
-			const reqBody = { email: 'valid@email.com', firstName: 'John', lastName: 'Potato' };
-			const req = mock<MeRequest.UserUpdate>({ user, body: reqBody, browserId });
+			const req = mock<MeRequest.UserUpdate>({ user, browserId });
+			req.body = {
+				email: 'valid@email.com',
+				firstName: 'John',
+				lastName: 'Potato',
+			};
 			const res = mock<Response>();
 			userRepository.findOneByOrFail.mockResolvedValue(user);
 			userRepository.findOneOrFail.mockResolvedValue(user);
@@ -67,7 +75,7 @@ describe('MeController', () => {
 			expect(externalHooks.run).toHaveBeenCalledWith('user.profile.beforeUpdate', [
 				user.id,
 				user.email,
-				reqBody,
+				req.body,
 			]);
 
 			expect(userService.update).toHaveBeenCalled();
@@ -98,25 +106,25 @@ describe('MeController', () => {
 				password: 'password',
 				authIdentities: [],
 				role: 'global:member',
+				mfaEnabled: false,
 			});
-			const reqBody = { email: 'valid@email.com', firstName: 'John', lastName: 'Potato' };
 			const req = mock<MeRequest.UserUpdate>({ user, browserId });
-			req.body = reqBody;
+			req.body = { email: 'valid@email.com', firstName: 'John', lastName: 'Potato' };
 			const res = mock<Response>();
 			userRepository.findOneOrFail.mockResolvedValue(user);
 			jest.spyOn(jwt, 'sign').mockImplementation(() => 'signed-token');
 
 			// Add invalid data to the request payload
-			Object.assign(reqBody, { id: '0', role: 'global:owner' });
+			Object.assign(req.body, { id: '0', role: 'global:owner' });
 
 			await controller.updateCurrentUser(req, res);
 
 			expect(userService.update).toHaveBeenCalled();
 
 			const updatePayload = userService.update.mock.calls[0][1];
-			expect(updatePayload.email).toBe(reqBody.email);
-			expect(updatePayload.firstName).toBe(reqBody.firstName);
-			expect(updatePayload.lastName).toBe(reqBody.lastName);
+			expect(updatePayload.email).toBe(req.body.email);
+			expect(updatePayload.firstName).toBe(req.body.firstName);
+			expect(updatePayload.lastName).toBe(req.body.lastName);
 			expect(updatePayload.id).toBeUndefined();
 			expect(updatePayload.role).toBeUndefined();
 		});
@@ -127,10 +135,11 @@ describe('MeController', () => {
 				password: 'password',
 				authIdentities: [],
 				role: 'global:owner',
+				mfaEnabled: false,
 			});
 			const reqBody = { email: 'valid@email.com', firstName: 'John', lastName: 'Potato' };
 			const req = mock<MeRequest.UserUpdate>({ user, body: reqBody });
-			// userService.findOneOrFail.mockResolvedValue(user);
+			req.body = reqBody; // We don't want the body to be a mock object
 
 			externalHooks.run.mockImplementationOnce(async (hookName) => {
 				if (hookName === 'user.profile.beforeUpdate') {
@@ -141,6 +150,76 @@ describe('MeController', () => {
 			await expect(controller.updateCurrentUser(req, mock())).rejects.toThrowError(
 				new BadRequestError('Invalid email address'),
 			);
+		});
+
+		describe('when mfa is enabled', () => {
+			it('should throw BadRequestError if mfa code is missing', async () => {
+				const user = mock<User>({
+					id: '123',
+					email: 'valid@email.com',
+					password: 'password',
+					authIdentities: [],
+					role: 'global:owner',
+					mfaEnabled: true,
+				});
+				const req = mock<MeRequest.UserUpdate>({ user, browserId });
+				req.body = { email: 'new@email.com', firstName: 'John', lastName: 'Potato' };
+
+				await expect(controller.updateCurrentUser(req, mock())).rejects.toThrowError(
+					new BadRequestError('Two-factor code is required to change email'),
+				);
+			});
+
+			it('should throw InvalidMfaCodeError if mfa code is invalid', async () => {
+				const user = mock<User>({
+					id: '123',
+					email: 'valid@email.com',
+					password: 'password',
+					authIdentities: [],
+					role: 'global:owner',
+					mfaEnabled: true,
+				});
+				const req = mock<MeRequest.UserUpdate>({ user, browserId });
+				req.body = {
+					email: 'new@email.com',
+					firstName: 'John',
+					lastName: 'Potato',
+					mfaCode: 'invalid',
+				};
+				mockMfaService.validateMfa.mockResolvedValue(false);
+
+				await expect(controller.updateCurrentUser(req, mock())).rejects.toThrow(
+					InvalidMfaCodeError,
+				);
+			});
+
+			it("should update the user's email if mfa code is valid", async () => {
+				const user = mock<User>({
+					id: '123',
+					email: 'valid@email.com',
+					password: 'password',
+					authIdentities: [],
+					role: 'global:owner',
+					mfaEnabled: true,
+				});
+				const req = mock<MeRequest.UserUpdate>({ user, browserId });
+				req.body = {
+					email: 'new@email.com',
+					firstName: 'John',
+					lastName: 'Potato',
+					mfaCode: '123456',
+				};
+				const res = mock<Response>();
+				userRepository.findOneByOrFail.mockResolvedValue(user);
+				userRepository.findOneOrFail.mockResolvedValue(user);
+				jest.spyOn(jwt, 'sign').mockImplementation(() => 'signed-token');
+				userService.toPublic.mockResolvedValue({} as unknown as PublicUser);
+				mockMfaService.validateMfa.mockResolvedValue(true);
+
+				const result = await controller.updateCurrentUser(req, res);
+
+				expect(result).toEqual({});
+			});
 		});
 	});
 
@@ -230,16 +309,14 @@ describe('MeController', () => {
 				);
 			});
 
-			it('should throw ForbiddenError if invalid mfa code is given', async () => {
+			it('should throw InvalidMfaCodeError if invalid mfa code is given', async () => {
 				const req = mock<MeRequest.Password>({
 					user: mock({ password: passwordHash, mfaEnabled: true }),
 					body: { currentPassword: 'old_password', newPassword: 'NewPassword123', mfaCode: '123' },
 				});
 				mockMfaService.validateMfa.mockResolvedValue(false);
 
-				await expect(controller.updatePassword(req, mock())).rejects.toThrowError(
-					new ForbiddenError('Invalid two-factor code.'),
-				);
+				await expect(controller.updatePassword(req, mock())).rejects.toThrow(InvalidMfaCodeError);
 			});
 
 			it('should succeed when mfa code is correct', async () => {
@@ -275,10 +352,40 @@ describe('MeController', () => {
 			);
 		});
 
-		it('should throw BadRequestError on XSS attempt', async () => {
-			const req = mock<MeRequest.SurveyAnswers>({
-				body: { 'test-answer': '<script>alert("XSS")</script>' },
-			});
+		test.each([
+			'automationGoalDevops',
+			'companyIndustryExtended',
+			'otherCompanyIndustryExtended',
+			'automationGoalSm',
+			'usageModes',
+		])('should throw BadRequestError on XSS attempt for an array field %s', async (fieldName) => {
+			const req = mock<MeRequest.SurveyAnswers>();
+			req.body = {
+				version: 'v4',
+				personalization_survey_n8n_version: '1.0.0',
+				personalization_survey_submitted_at: new Date().toISOString(),
+				[fieldName]: ['<script>alert("XSS")</script>'],
+			};
+
+			await expect(controller.storeSurveyAnswers(req)).rejects.toThrowError(BadRequestError);
+		});
+
+		test.each([
+			'automationGoalDevopsOther',
+			'companySize',
+			'companyType',
+			'automationGoalSmOther',
+			'roleOther',
+			'reportedSource',
+			'reportedSourceOther',
+		])('should throw BadRequestError on XSS attempt for a string field %s', async (fieldName) => {
+			const req = mock<MeRequest.SurveyAnswers>();
+			req.body = {
+				version: 'v4',
+				personalization_survey_n8n_version: '1.0.0',
+				personalization_survey_submitted_at: new Date().toISOString(),
+				[fieldName]: '<script>alert("XSS")</script>',
+			};
 
 			await expect(controller.storeSurveyAnswers(req)).rejects.toThrowError(BadRequestError);
 		});

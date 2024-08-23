@@ -16,17 +16,17 @@ import {
 import type { Scope } from '@n8n/permissions';
 import * as Db from '@/Db';
 import type { ICredentialsDb } from '@/Interfaces';
-import { createCredentialsFromCredentialsEntity } from '@/CredentialsHelper';
+import { createCredentialsFromCredentialsEntity } from '@/credentials-helper';
 import { CREDENTIAL_BLANKING_VALUE } from '@/constants';
 import { CredentialsEntity } from '@db/entities/CredentialsEntity';
 import { SharedCredentials } from '@db/entities/SharedCredentials';
-import { validateEntity } from '@/GenericHelpers';
-import { ExternalHooks } from '@/ExternalHooks';
+import { validateEntity } from '@/generic-helpers';
+import { ExternalHooks } from '@/external-hooks';
 import type { User } from '@db/entities/User';
 import type { CredentialRequest, ListQuery } from '@/requests';
-import { CredentialTypes } from '@/CredentialTypes';
+import { CredentialTypes } from '@/credential-types';
 import { OwnershipService } from '@/services/ownership.service';
-import { Logger } from '@/Logger';
+import { Logger } from '@/logger';
 import { CredentialsRepository } from '@db/repositories/credentials.repository';
 import { SharedCredentialsRepository } from '@db/repositories/sharedCredentials.repository';
 import { Service } from 'typedi';
@@ -38,6 +38,7 @@ import { NotFoundError } from '@/errors/response-errors/not-found.error';
 import type { ProjectRelation } from '@/databases/entities/ProjectRelation';
 import { RoleService } from '@/services/role.service';
 import { UserRepository } from '@/databases/repositories/user.repository';
+import { userHasScope } from '@/permissions/check-access';
 
 export type CredentialsGetSharedOptions =
 	| { allowGlobalScope: true; globalScope: Scope }
@@ -599,28 +600,20 @@ export class CredentialsService {
 		);
 	}
 
-	replaceCredentialContentsForSharee(
+	async replaceCredentialContentsForSharee(
 		user: User,
 		credential: CredentialsEntity,
 		decryptedData: ICredentialDataDecryptedObject,
 		mergedCredentials: ICredentialsDecrypted,
 	) {
-		credential.shared.forEach((sharedCredentials) => {
-			if (sharedCredentials.role === 'credential:owner') {
-				if (sharedCredentials.project.type === 'personal') {
-					// Find the owner of this personal project
-					sharedCredentials.project.projectRelations.forEach((projectRelation) => {
-						if (
-							projectRelation.role === 'project:personalOwner' &&
-							projectRelation.user.id !== user.id
-						) {
-							// If we realize that the current user does not own this credential
-							// We replace the payload with the stored decrypted data
-							mergedCredentials.data = decryptedData;
-						}
-					});
-				}
-			}
-		});
+		// We may want to change this to 'credential:decrypt' if that gets added, but this
+		// works for now. The only time we wouldn't want to do this is if the user
+		// could actually be testing the credential before saving it, so this should cover
+		// the cases we need it for.
+		if (
+			!(await userHasScope(user, ['credential:update'], false, { credentialId: credential.id }))
+		) {
+			mergedCredentials.data = decryptedData;
+		}
 	}
 }
