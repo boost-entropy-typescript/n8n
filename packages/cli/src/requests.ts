@@ -49,6 +49,9 @@ export type AuthenticatedRequest<
 > = Omit<APIRequest<RouteParams, ResponseBody, RequestBody, RequestQuery>, 'user' | 'cookies'> & {
 	user: User;
 	cookies: Record<string, string | undefined>;
+	headers: express.Request['headers'] & {
+		'push-ref': string;
+	};
 };
 
 // ----------------------------------
@@ -183,6 +186,7 @@ export declare namespace CredentialRequest {
 
 export declare namespace MeRequest {
 	export type SurveyAnswers = AuthenticatedRequest<{}, {}, IPersonalizationSurveyAnswersV4>;
+	export type DeleteAPIKey = AuthenticatedRequest<{ id: string }>;
 }
 
 export interface UserSetupPayload {
