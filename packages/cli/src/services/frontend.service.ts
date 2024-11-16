@@ -1,5 +1,5 @@
 import type { FrontendSettings, ITelemetrySettings } from '@n8n/api-types';
-import { GlobalConfig } from '@n8n/config';
+import { GlobalConfig, FrontendConfig, SecurityConfig } from '@n8n/config';
 import { createWriteStream } from 'fs';
 import { mkdir } from 'fs/promises';
 import uniq from 'lodash/uniq';
@@ -10,7 +10,7 @@ import path from 'path';
 import { Container, Service } from 'typedi';
 
 import config from '@/config';
-import { LICENSE_FEATURES, N8N_VERSION } from '@/constants';
+import { inE2ETests, LICENSE_FEATURES, N8N_VERSION } from '@/constants';
 import { CredentialTypes } from '@/credential-types';
 import { CredentialsOverwrites } from '@/credentials-overwrites';
 import { getVariablesLimit } from '@/environments/variables/environment-helpers';
@@ -46,6 +46,8 @@ export class FrontendService {
 		private readonly mailer: UserManagementMailer,
 		private readonly instanceSettings: InstanceSettings,
 		private readonly urlService: UrlService,
+		private readonly securityConfig: SecurityConfig,
+		private readonly frontendConfig: FrontendConfig,
 	) {
 		loadNodesAndCredentials.addPostProcessor(async () => await this.generateTypes());
 		void this.generateTypes();
@@ -80,6 +82,7 @@ export class FrontendService {
 		}
 
 		this.settings = {
+			inE2ETests,
 			isDocker: this.isDocker(),
 			databaseType: this.globalConfig.database.type,
 			previewMode: process.env.N8N_PREVIEW_MODE === 'true',
@@ -220,13 +223,14 @@ export class FrontendService {
 				licensePruneTime: -1,
 			},
 			pruning: {
-				isEnabled: config.getEnv('executions.pruneData'),
-				maxAge: config.getEnv('executions.pruneDataMaxAge'),
-				maxCount: config.getEnv('executions.pruneDataMaxCount'),
+				isEnabled: this.globalConfig.pruning.isEnabled,
+				maxAge: this.globalConfig.pruning.maxAge,
+				maxCount: this.globalConfig.pruning.maxCount,
 			},
 			security: {
-				blockFileAccessToN8nFiles: config.getEnv('security.blockFileAccessToN8nFiles'),
+				blockFileAccessToN8nFiles: this.securityConfig.blockFileAccessToN8nFiles,
 			},
+			betaFeatures: this.frontendConfig.betaFeatures,
 		};
 	}
 

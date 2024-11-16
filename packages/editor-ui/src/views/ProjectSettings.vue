@@ -7,8 +7,7 @@ import { useUsersStore } from '@/stores/users.store';
 import type { IUser } from '@/Interface';
 import { useI18n } from '@/composables/useI18n';
 import { useProjectsStore } from '@/stores/projects.store';
-import ProjectTabs from '@/components/Projects/ProjectTabs.vue';
-import type { Project, ProjectRelation } from '@/types/projects.types';
+import { type Project, type ProjectRelation } from '@/types/projects.types';
 import { useToast } from '@/composables/useToast';
 import { VIEWS } from '@/constants';
 import ProjectDeleteDialog from '@/components/Projects/ProjectDeleteDialog.vue';
@@ -18,6 +17,7 @@ import type { ProjectRole } from '@/types/roles.types';
 import { useCloudPlanStore } from '@/stores/cloudPlan.store';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useDocumentTitle } from '@/composables/useDocumentTitle';
+import ProjectHeader from '@/components/Projects/ProjectHeader.vue';
 
 type FormDataDiff = {
 	name?: string;
@@ -260,7 +260,7 @@ onMounted(() => {
 <template>
 	<div :class="$style.projectSettings">
 		<div :class="$style.header">
-			<ProjectTabs />
+			<ProjectHeader />
 		</div>
 		<form @submit.prevent="onSubmit">
 			<fieldset>
