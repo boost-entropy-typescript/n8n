@@ -1,8 +1,6 @@
 import type { Scope } from '@n8n/permissions';
-import type { AiAssistantSDK } from '@n8n_io/ai-assistant-sdk';
 import type express from 'express';
 import type {
-	BannerName,
 	ICredentialDataDecryptedObject,
 	IDataObject,
 	ILoadOptions,
@@ -20,7 +18,7 @@ import type { AssignableRole, GlobalRole, User } from '@/databases/entities/user
 import type { Variables } from '@/databases/entities/variables';
 import type { WorkflowEntity } from '@/databases/entities/workflow-entity';
 import type { WorkflowHistory } from '@/databases/entities/workflow-history';
-import type { PublicUser, SecretsProvider, SecretsProviderState } from '@/interfaces';
+import type { SecretsProvider, SecretsProviderState } from '@/interfaces';
 
 import type { ProjectRole } from './databases/entities/project-relation';
 import type { ScopesField } from './services/role.service';
@@ -196,42 +194,6 @@ export declare namespace MeRequest {
 	export type SurveyAnswers = AuthenticatedRequest<{}, {}, IPersonalizationSurveyAnswersV4>;
 }
 
-export interface UserSetupPayload {
-	email: string;
-	password: string;
-	firstName: string;
-	lastName: string;
-	mfaEnabled?: boolean;
-	mfaSecret?: string;
-	mfaRecoveryCodes?: string[];
-}
-
-// ----------------------------------
-//             /owner
-// ----------------------------------
-
-export declare namespace OwnerRequest {
-	type Post = AuthenticatedRequest<{}, {}, UserSetupPayload, {}>;
-
-	type DismissBanner = AuthenticatedRequest<{}, {}, Partial<{ bannerName: BannerName }>, {}>;
-}
-
-// ----------------------------------
-//     password reset endpoints
-// ----------------------------------
-
-export declare namespace PasswordResetRequest {
-	export type Email = AuthlessRequest<{}, {}, Pick<PublicUser, 'email'>>;
-
-	export type Credentials = AuthlessRequest<{}, {}, {}, { userId?: string; token?: string }>;
-
-	export type NewPassword = AuthlessRequest<
-		{},
-		{},
-		Pick<PublicUser, 'password'> & { token?: string; userId?: string; mfaCode?: string }
-	>;
-}
-
 // ----------------------------------
 //             /users
 // ----------------------------------
@@ -253,18 +215,6 @@ export declare namespace UserRequest {
 		};
 		error?: string;
 	};
-
-	export type ResolveSignUp = AuthlessRequest<
-		{},
-		{},
-		{},
-		{ inviterId?: string; inviteeId?: string }
-	>;
-
-	export type SignUp = AuthenticatedRequest<
-		{ id: string },
-		{ inviterId?: string; inviteeId?: string }
-	>;
 
 	export type Delete = AuthenticatedRequest<
 		{ id: string; email: string; identifier: string },
@@ -295,21 +245,6 @@ export declare namespace UserRequest {
 		}
 	>;
 }
-
-// ----------------------------------
-//             /login
-// ----------------------------------
-
-export type LoginRequest = AuthlessRequest<
-	{},
-	{},
-	{
-		email: string;
-		password: string;
-		mfaCode?: string;
-		mfaRecoveryCode?: string;
-	}
->;
 
 // ----------------------------------
 //          MFA endpoints
@@ -573,16 +508,4 @@ export declare namespace NpsSurveyRequest {
 	// type NpsSurveyUpdate = AuthenticatedRequest<{}, {}, NpsSurveyState>;
 	// once some schema validation is added
 	type NpsSurveyUpdate = AuthenticatedRequest<{}, {}, unknown>;
-}
-
-// ----------------------------------
-//             /ai-assistant
-// ----------------------------------
-
-export declare namespace AiAssistantRequest {
-	type Chat = AuthenticatedRequest<{}, {}, AiAssistantSDK.ChatRequestPayload>;
-
-	type SuggestionPayload = { sessionId: string; suggestionId: string };
-	type ApplySuggestionPayload = AuthenticatedRequest<{}, {}, SuggestionPayload>;
-	type AskAiPayload = AuthenticatedRequest<{}, {}, AiAssistantSDK.AskAiRequestPayload>;
 }
