@@ -992,6 +992,7 @@ export type ISupplyDataFunctions = ExecuteFunctions.GetNodeParameterFn &
 		| 'sendMessageToUI'
 		| 'helpers'
 	> & {
+		getNextRunIndex(): number;
 		continueOnFail(): boolean;
 		evaluateExpression(expression: string, itemIndex: number): NodeParameterValueType;
 		getWorkflowDataProxy(itemIndex: number): IWorkflowDataProxyData;
@@ -2162,9 +2163,6 @@ export interface IRunExecutionData {
 	parentExecution?: RelatedExecution;
 	waitTill?: Date;
 	pushRef?: string;
-
-	/** Whether this execution was started by a test webhook call. */
-	isTestWebhook?: boolean;
 
 	/** Data needed for a worker to run a manual execution. */
 	manualData?: Pick<
