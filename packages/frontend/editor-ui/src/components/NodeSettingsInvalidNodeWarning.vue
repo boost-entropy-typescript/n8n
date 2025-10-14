@@ -7,7 +7,7 @@ import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeCreatorStore } from '@/stores/nodeCreator.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useUIStore } from '@/stores/ui.store';
-import { useUsersStore } from '@/stores/users.store';
+import { useUsersStore } from '@/features/users/users.store';
 import { N8nButton, N8nIcon, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { isCommunityPackageName } from 'n8n-workflow';
@@ -149,7 +149,7 @@ watch(isNodeDefined, () => {
 <style lang="scss" module>
 .communityNodeActionsContainer {
 	display: flex;
-	gap: var(--spacing-2xs);
+	gap: var(--spacing--2xs);
 }
 
 .nodeIsNotValid {
@@ -171,7 +171,7 @@ watch(isNodeDefined, () => {
 .descriptionContainer {
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-2xs);
+	gap: var(--spacing--2xs);
 	align-items: center;
 }
 </style>

@@ -1,19 +1,19 @@
 import { defineStore } from 'pinia';
 import { CHAT_STORE } from './constants';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import {
 	fetchChatModelsApi,
 	sendText,
 	fetchConversationsApi as fetchSessionsApi,
-	fetchConversationMessagesApi as fetchMessagesApi,
+	fetchSingleConversationApi as fetchMessagesApi,
 } from './chat.api';
 import { useRootStore } from '@n8n/stores/useRootStore';
 import type {
 	ChatHubConversationModel,
 	ChatHubSendMessageRequest,
 	ChatModelsResponse,
-	ChatHubConversation,
+	ChatHubSessionDto,
 } from '@n8n/api-types';
 import type { StructuredChunk, ChatMessage, CredentialsMap } from './chat.types';
 
@@ -21,9 +21,11 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 	const rootStore = useRootStore();
 	const models = ref<ChatModelsResponse>();
 	const loadingModels = ref(false);
-	const isResponding = ref(false);
+	const streamingMessageId = ref<string>();
 	const messagesBySession = ref<Partial<Record<string, ChatMessage[]>>>({});
-	const sessions = ref<ChatHubConversation[]>([]);
+	const sessions = ref<ChatHubSessionDto[]>([]);
+
+	const isResponding = computed(() => streamingMessageId.value !== undefined);
 
 	const getLastMessage = (sessionId: string) => {
 		const msgs = messagesBySession.value[sessionId];
@@ -45,16 +47,17 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 	}
 
 	async function fetchMessages(sessionId: string) {
-		const messages = await fetchMessagesApi(rootStore.restApiContext, sessionId);
+		const { conversation } = await fetchMessagesApi(rootStore.restApiContext, sessionId);
+		const { messages, activeMessageChain } = conversation;
 
 		messagesBySession.value = {
 			...messagesBySession.value,
-			[sessionId]: messages.map((msg) => ({
-				id: msg.id,
-				role: msg.role,
+			[sessionId]: activeMessageChain.map((id) => ({
+				id: messages[id].id,
+				role: messages[id].type === 'ai' ? 'assistant' : 'user',
 				type: 'message' as const,
-				text: msg.content,
-				key: msg.id,
+				text: messages[id].content,
+				key: messages[id].id,
 			})),
 		};
 	}
@@ -107,7 +110,7 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 	}
 
 	function onBeginMessage(sessionId: string, messageId: string, nodeId: string, runIndex?: number) {
-		isResponding.value = true;
+		streamingMessageId.value = messageId;
 		addAiMessage(sessionId, '', messageId, `${messageId}-${nodeId}-${runIndex ?? 0}`);
 	}
 
@@ -123,7 +126,7 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function onEndMessage(_messageId: string, _nodeId: string, _runIndex?: number) {
-		isResponding.value = false;
+		streamingMessageId.value = undefined;
 	}
 
 	function onStreamMessage(sessionId: string, message: StructuredChunk, messageId: string) {
@@ -156,12 +159,12 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 	}
 
 	function onStreamDone() {
-		isResponding.value = false;
+		streamingMessageId.value = undefined;
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function onStreamError(_e: Error) {
-		isResponding.value = false;
+		streamingMessageId.value = undefined;
 	}
 
 	function askAI(
@@ -171,6 +174,7 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 		credentials: ChatHubSendMessageRequest['credentials'],
 	) {
 		const messageId = uuidv4();
+		const replyId = uuidv4();
 		const previousMessageId = getLastMessage(sessionId)?.id ?? null;
 
 		addUserMessage(sessionId, message, messageId);
@@ -181,14 +185,35 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 				model,
 				messageId,
 				sessionId,
+				replyId,
 				message,
 				credentials,
 				previousMessageId,
 			},
-			(chunk: StructuredChunk) => onStreamMessage(sessionId, chunk, messageId),
+			(chunk: StructuredChunk) => onStreamMessage(sessionId, chunk, replyId),
 			onStreamDone,
 			onStreamError,
 		);
+	}
+
+	async function renameSession(sessionId: string, name: string) {
+		// Optimistic update
+		sessions.value = sessions.value.map((session) =>
+			session.id === sessionId ? { ...session, title: name } : session,
+		);
+
+		// TODO: call the endpoint
+	}
+
+	async function deleteSession(sessionId: string) {
+		// Optimistic update
+		sessions.value = sessions.value.filter((session) => session.id !== sessionId);
+
+		// TODO: call the endpoint
+	}
+
+	async function updateChatMessage(_sessionId: string, _messageId: string, _content: string) {
+		// TODO: call the endpoint
 	}
 
 	return {
@@ -196,11 +221,15 @@ export const useChatStore = defineStore(CHAT_STORE, () => {
 		loadingModels,
 		messagesBySession,
 		isResponding,
+		streamingMessageId,
 		sessions,
 		fetchChatModels,
 		askAI,
 		addUserMessage,
 		fetchSessions,
 		fetchMessages,
+		renameSession,
+		deleteSession,
+		updateChatMessage,
 	};
 });

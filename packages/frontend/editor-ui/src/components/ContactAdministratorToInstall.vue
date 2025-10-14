@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useUsersStore } from '@/stores/users.store';
+import { useUsersStore } from '@/features/users/users.store';
 import { N8nIcon, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { computed, useCssModule } from 'vue';
@@ -43,12 +43,12 @@ const classes = computed(() => ({
 .contactOwnerHint {
 	display: flex;
 	align-items: center;
-	gap: var(--spacing-s);
-	padding: var(--spacing-xs);
+	gap: var(--spacing--sm);
+	padding: var(--spacing--xs);
 	border-radius: 0.25em;
 }
 
 .border {
-	border: var(--border-width-base) solid var(--color-foreground-base);
+	border: var(--border-width) solid var(--color--foreground);
 }
 </style>
