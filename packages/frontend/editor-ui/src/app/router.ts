@@ -6,7 +6,7 @@ import type {
 	RouteLocationNormalized,
 } from 'vue-router';
 import { createRouter, createWebHistory, isNavigationFailure, RouterView } from 'vue-router';
-import { nanoid } from 'nanoid';
+import { generateNanoId } from '@n8n/utils';
 import { useExternalHooks } from '@/app/composables/useExternalHooks';
 import { useSettingsStore } from '@/app/stores/settings.store';
 import { useTemplatesStore } from '@/features/workflows/templates/templates.store';
@@ -103,6 +103,8 @@ const ResourceCenterView = async () =>
 	await import('@/experiments/resourceCenter/views/ResourceCenterView.vue');
 const ResourceCenterSectionView = async () =>
 	await import('@/experiments/resourceCenter/views/ResourceCenterSectionView.vue');
+const SecuritySettingsView = async () =>
+	await import('@/features/settings/security/SecuritySettings.vue');
 
 const MigrationReportView = async () =>
 	await import('@/features/settings/migrationReport/MigrationRules.vue');
@@ -371,9 +373,9 @@ export const routes: RouteRecordRaw[] = [
 			middleware: ['authenticated'],
 		},
 		beforeEnter: (to) => {
-			// Generate a unique workflow ID using nanoid and redirect to it
+			// Generate a unique workflow ID using 16-character nanoid and redirect to it
 			// Preserve existing query params (e.g., templateId, projectId) and add new=true
-			const newWorkflowId = nanoid();
+			const newWorkflowId = generateNanoId();
 			return {
 				name: VIEWS.WORKFLOW,
 				params: { name: newWorkflowId },
@@ -593,6 +595,28 @@ export const routes: RouteRecordRaw[] = [
 						getProperties() {
 							return {
 								feature: 'personal',
+							};
+						},
+					},
+				},
+			},
+			{
+				path: 'security',
+				name: VIEWS.SECURITY_SETTINGS,
+				component: SecuritySettingsView,
+				meta: {
+					middleware: ['authenticated', 'custom'],
+					middlewareOptions: {
+						custom: () => {
+							const { check } = useEnvFeatureFlag();
+							return check.value('PERSONAL_SECURITY_SETTINGS');
+						},
+					},
+					telemetry: {
+						pageCategory: 'settings',
+						getProperties() {
+							return {
+								feature: 'security',
 							};
 						},
 					},
