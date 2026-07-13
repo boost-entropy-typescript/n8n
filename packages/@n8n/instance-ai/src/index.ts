@@ -622,9 +622,14 @@ export type {
 	WebSearchResponse,
 	InstanceAiWebResearchService,
 	InstanceAiWorkspaceService,
+	InstanceAiWorkflowTemplateService,
 	ProjectSummary,
 	FolderSummary,
 	ServiceProxyConfig,
+	InstanceAiBuilderDelegate,
+	BuilderDelegateSession,
+	BuilderTurnStream,
+	SessionWorkflowRef,
 } from './types';
 export type {
 	OrchestratorRunHandoffReason,
