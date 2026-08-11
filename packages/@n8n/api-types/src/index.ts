@@ -13,6 +13,7 @@ export * from './instance-registry-types';
 export * from './redaction-enforcement';
 export * from './redaction-enforcement-floor';
 export * from './workflow-reviews-policy';
+export type * from './workflow-review-activity';
 export type * from './workflow-review-eligible-reviewer';
 export * from './workflow-review-request-summary';
 export * from './workflow-publish-blocked-details';
@@ -394,6 +395,7 @@ export type {
 	InstanceAiCatalogProvider,
 	InstanceAiCatalogModel,
 	InstanceAiModelCatalogResponse,
+	InstanceAiCredits,
 } from './schemas/instance-ai.schema';
 
 export type {
@@ -612,6 +614,8 @@ export {
 	AGENT_EVAL_RESULTS_DEFAULT_TAKE,
 	AgentEvalRunDetailQueryDto,
 	agentEvalCorrectionSchema,
+	AGENT_EVAL_MAX_COMMENT_CHARS,
+	AGENT_EVAL_MAX_CORRECTION_TEXT_CHARS,
 	createAgentEvalRatingSchema,
 	CreateAgentEvalRatingDto,
 	agentEvalDraftCaseSchema,
