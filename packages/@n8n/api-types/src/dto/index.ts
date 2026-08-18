@@ -200,7 +200,11 @@ export {
 	RoleGetPublicDto,
 } from './roles/role-public.dto';
 export { CreateRoleMappingRuleDto } from './roles/create-role-mapping-rule.dto';
-export { RoleMappingRulePublicDto } from './roles/role-mapping-rule-public.dto';
+export {
+	RoleMappingRulePublicDto,
+	RoleMappingRuleListPublicDto,
+	RoleMappingRuleListQueryPublicDto,
+} from './roles/role-mapping-rule-public.dto';
 export {
 	PatchRoleMappingRuleDto,
 	type PatchRoleMappingRuleInput,
@@ -314,6 +318,7 @@ export {
 	ExecutionRedactionQueryDtoSchema,
 	type ExecutionRedactionQueryDto,
 } from './executions/execution-redaction-query.dto';
+export { DeleteExecutionsDto } from './executions/delete-executions.dto';
 
 export { VersionSinceDateQueryDto } from './instance-version-history/version-since-date-query.dto';
 export { VersionQueryDto } from './instance-version-history/version-query.dto';
