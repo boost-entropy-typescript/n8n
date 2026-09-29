@@ -3,6 +3,7 @@ import {
 	type AgentChatAttachmentPayload,
 	AgentChatMessageDto,
 	AgentChatQueueUpdateDto,
+	AgentChatQueueSteerDto,
 	type AgentChatMessagesResponse,
 	type AgentChatQueueResponse,
 	AgentChatResumeDto,
@@ -337,7 +338,7 @@ export class AgentChatController {
 	) {
 		const { projectId } = req.params;
 		// The text-or-attachment invariant is enforced by the DTO schema.
-		const { message, sessionId, newSession, attachments } = payload;
+		const { message, sessionId, messageId, newSession, attachments } = payload;
 
 		const credentialProvider = new AgentsCredentialProvider(
 			this.credentialsService,
@@ -386,7 +387,7 @@ export class AgentChatController {
 			});
 			abortSignal.throwIfAborted();
 
-			const item = await this.messageQueue.enqueue(
+			const result = await this.messageQueue.enqueue(
 				{
 					agentId,
 					projectId,
@@ -396,6 +397,7 @@ export class AgentChatController {
 					payload: {
 						kind: 'preview',
 						message,
+						messageId,
 						attachments: storedAttachments,
 						userId: req.user.id,
 						resourceId: draftChatMemoryResourceId(req.user.id),
@@ -405,17 +407,15 @@ export class AgentChatController {
 					subscription = this.queuedPreviewStreams.subscribe(queueId, delivery);
 				},
 			);
+			if (result.status === 'duplicate') {
+				send({ type: 'done' });
+				return;
+			}
 			accepted = true;
 			subscription?.accepted();
-			send({ type: 'message-queued', queueId: item.id, sessionId: threadId });
+			send({ type: 'message-queued', queueId: result.item.id, sessionId: threadId });
 			await subscription?.done;
 		} catch (error) {
-			// Committed messages own their attachments, including after a disconnect.
-			if (!accepted && storedAttachments?.length) {
-				await this.agentChatAttachmentService
-					.deleteByIds(storedAttachments.map((ref) => ref.id))
-					.catch(() => {});
-			}
 			const errorMessage = error instanceof Error ? error.message : 'Chat failed';
 			send({
 				type: 'error',
@@ -425,6 +425,12 @@ export class AgentChatController {
 					: {}),
 			});
 		} finally {
+			// Committed messages own their attachments, including after a disconnect.
+			if (!accepted && storedAttachments?.length) {
+				await this.agentChatAttachmentService
+					.deleteByIds(storedAttachments.map((ref) => ref.id))
+					.catch(() => {});
+			}
 			subscription?.close();
 			delivery.close();
 		}
@@ -659,6 +665,28 @@ export class AgentChatController {
 		if (!agent) throw new NotFoundError('Agent not found');
 		await this.messageQueue.removePending({ ...req.params, userId: req.user.id });
 		return { removed: true };
+	}
+
+	@Post('/:agentId/chat/:threadId/queue/:queueId/steer')
+	@ProjectScope('agent:execute')
+	async steerQueuedMessage(
+		req: AuthenticatedRequest<{
+			projectId: string;
+			agentId: string;
+			threadId: string;
+			queueId: string;
+		}>,
+		_res: Response,
+		@Body payload: AgentChatQueueSteerDto,
+	): Promise<void> {
+		if (!/^[1-9]\d*$/.test(req.params.queueId)) throw new BadRequestError('Invalid queue ID');
+		const agent = await this.agentsService.findById(req.params.agentId, req.params.projectId);
+		if (!agent) throw new NotFoundError('Agent not found');
+		await this.messageQueue.steer({
+			...req.params,
+			userId: req.user.id,
+			executionId: payload.executionId,
+		});
 	}
 
 	@Get('/:agentId/chat/:threadId/background-tasks')
